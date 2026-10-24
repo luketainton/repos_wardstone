@@ -126,11 +126,15 @@ def plan(args):
     event = json.loads(Path(os.environ.get("GITHUB_EVENT_PATH", os.environ.get("GITEA_EVENT_PATH", "/dev/null"))).read_text() or "{}")
     name = os.environ.get("GITHUB_EVENT_NAME", os.environ.get("GITEA_EVENT_NAME", "workflow_dispatch"))
     inputs = event.get("inputs", {})
-    publish = name in ("push", "release") or str(inputs.get("publish", "false")).lower() == "true"
+    publish = name in ("push", "create", "release") or str(inputs.get("publish", "false")).lower() == "true"
     tag = event.get("release", {}).get("tag_name") or inputs.get("tag")
-    if not tag and name == "push":
+    if not tag and name in ("push", "create"):
         ref = os.environ.get("GITHUB_REF", os.environ.get("GITEA_REF", ""))
-        if not ref.startswith("refs/tags/"):
+        if name == "create":
+            if event.get("ref_type") != "tag":
+                raise ValueError("Publishing requires a tag event")
+            ref = event.get("ref", ref)
+        elif not ref.startswith("refs/tags/"):
             raise ValueError("Publishing requires a tag event")
         tag = ref.removeprefix("refs/tags/")
     if not tag:

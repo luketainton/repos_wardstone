@@ -50,6 +50,17 @@ class ReleaseTests(unittest.TestCase):
             self.assertIn("tag=v0.0.0-ci.7\n", text)
             self.assertIn("publish=false\n", text)
 
+    def test_ui_tag_creation_resolves_the_tag(self):
+        for ref in ("v1.2.3", "refs/tags/v1.2.3"):
+            with self.subTest(ref=ref), tempfile.TemporaryDirectory() as temp:
+                event, output = Path(temp) / "event.json", Path(temp) / "output"
+                event.write_text(json.dumps({"ref_type": "tag", "ref": ref}))
+                env = {"GITHUB_EVENT_PATH": str(event), "GITHUB_EVENT_NAME": "create", "GITHUB_OUTPUT": str(output), "REGISTRY_TOKEN": "test-placeholder"}
+                with patch.dict(os.environ, env, clear=True), patch.object(release, "command", side_effect=["a" * 40, "a" * 40, "1792800000"]), patch.object(release.API, "request", return_value={"login": "publisher"}), patch.object(release.API, "release", return_value=None), contextlib.redirect_stdout(io.StringIO()):
+                    release.plan(None)
+                self.assertIn("tag=v1.2.3\n", output.read_text())
+                self.assertIn("publish=true\n", output.read_text())
+
     def test_publication_requires_matching_tag_commit(self):
         with tempfile.TemporaryDirectory() as temp:
             event = Path(temp) / "event.json"

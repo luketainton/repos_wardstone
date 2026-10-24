@@ -12,7 +12,7 @@ The repository SHALL run formatting checks, vetting, race-enabled Go tests, rele
 - **THEN** it verifies that anonymous admin access is denied, the generated P12 authenticates successfully, and restart preserves the credential without logging its password again
 
 ### Requirement: Versioned releases
-The release workflow SHALL run for pushed version tags and published Gitea releases. It SHALL verify the checked-out commit matches the requested tag and SHALL reject malformed versions.
+The release workflow SHALL run for pushed version tags, tags created through Gitea UI/API, and published Gitea releases. It SHALL verify the checked-out commit matches the requested tag and SHALL reject malformed versions.
 
 #### Scenario: New version tag
 - **WHEN** a tag matching vMAJOR.MINOR.PATCH or a prerelease variant is pushed

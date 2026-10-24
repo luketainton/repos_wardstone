@@ -1,6 +1,7 @@
 name: Release
 
 on:
+  create:
   push:
     tags: ['v*']
   release:
@@ -31,6 +32,7 @@ env:
 
 jobs:
   release:
+    if: github.event_name != 'create' || (github.event.ref_type == 'tag' && (startsWith(github.event.ref, 'v') || startsWith(github.event.ref, 'refs/tags/v')))
     name: Validate, package, and publish
     runs-on: ubuntu-latest
     timeout-minutes: 60
