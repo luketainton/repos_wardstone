@@ -10,3 +10,8 @@
 *.db-shm
 *.db-wal
 coverage.out
+
+# Release build output
+/dist/
+__pycache__/
+*.pyc

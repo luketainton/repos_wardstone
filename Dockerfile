@@ -1,9 +1,17 @@
-FROM golang:1.27.3-bookworm AS build
+FROM --platform=$BUILDPLATFORM golang:1.27.3-bookworm AS build
 WORKDIR /build
 COPY go.mod go.sum ./
 RUN go mod download
 COPY src/ ./src/
-RUN CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /wardstone ./src
+ARG TARGETOS
+ARG TARGETARCH
+ARG VERSION=dev
+ARG COMMIT=unknown
+ARG BUILD_DATE=unknown
+RUN CGO_ENABLED=0 GOOS="${TARGETOS:-linux}" GOARCH="${TARGETARCH:-$(go env GOARCH)}" \
+    go build -trimpath -buildvcs=false \
+    -ldflags="-s -w -X main.version=${VERSION} -X main.commit=${COMMIT} -X main.buildDate=${BUILD_DATE}" \
+    -o /wardstone ./src
 
 FROM debian:bookworm-slim
 RUN groupadd --gid 10001 wardstone && useradd --uid 10001 --gid wardstone --no-create-home wardstone \

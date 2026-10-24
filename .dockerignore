@@ -10,3 +10,8 @@ wardstone
 *.key
 *.db*
 .env
+
+# Release build output
+/dist/
+__pycache__/
+*.pyc

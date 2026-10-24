@@ -14,6 +14,12 @@ import (
 	"time"
 )
 
+var (
+	version   = "dev"
+	commit    = "unknown"
+	buildDate = "unknown"
+)
+
 type config struct{ DataDir, BootstrapDir, Issuer, Listen, TLSCert, TLSKey string }
 
 func env(k, v string) string {
@@ -23,6 +29,10 @@ func env(k, v string) string {
 	return v
 }
 func main() {
+	if len(os.Args) == 2 && (os.Args[1] == "--version" || os.Args[1] == "-version") {
+		fmt.Printf("Wardstone %s (commit %s, built %s)\n", version, commit, buildDate)
+		return
+	}
 	c := config{env("WARDSTONE_DATA_DIR", "/data"), env("WARDSTONE_BOOTSTRAP_DIR", "/bootstrap"), env("WARDSTONE_ISSUER", "https://localhost:8443"), env("WARDSTONE_LISTEN", ":8443"), os.Getenv("WARDSTONE_TLS_CERT"), os.Getenv("WARDSTONE_TLS_KEY")}
 	if err := run(c); err != nil {
 		log.Fatal(err)
