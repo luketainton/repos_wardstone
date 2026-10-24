@@ -1,0 +1,12 @@
+.git
+.agents
+.codex
+data
+bootstrap
+work
+wardstone
+*.p12
+*.pfx
+*.key
+*.db*
+.env

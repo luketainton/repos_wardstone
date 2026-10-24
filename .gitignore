@@ -1,0 +1,12 @@
+/data/
+/bootstrap/
+/wardstone
+/.env
+*.p12
+*.pfx
+*.key
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+coverage.out

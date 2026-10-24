@@ -1,0 +1,9 @@
+.PHONY: test check build
+test:
+	go test -race ./...
+check:
+	test -z "$$(gofmt -l src)"
+	go vet ./...
+	go test -race ./...
+build:
+	CGO_ENABLED=0 go build -trimpath -o wardstone ./src
