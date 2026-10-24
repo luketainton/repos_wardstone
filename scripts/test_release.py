@@ -5,6 +5,7 @@ import importlib.util
 import io
 import json
 import os
+import re
 from pathlib import Path
 import tempfile
 import unittest
@@ -50,16 +51,67 @@ class ReleaseTests(unittest.TestCase):
             self.assertIn("tag=v0.0.0-ci.7\n", text)
             self.assertIn("publish=false\n", text)
 
-    def test_ui_tag_creation_resolves_the_tag(self):
+    def test_ui_tag_creation_prepares_release_for_short_and_full_refs(self):
         for ref in ("v1.2.3", "refs/tags/v1.2.3"):
             with self.subTest(ref=ref), tempfile.TemporaryDirectory() as temp:
-                event, output = Path(temp) / "event.json", Path(temp) / "output"
+                event = Path(temp) / "event.json"
                 event.write_text(json.dumps({"ref_type": "tag", "ref": ref}))
-                env = {"GITHUB_EVENT_PATH": str(event), "GITHUB_EVENT_NAME": "create", "GITHUB_OUTPUT": str(output), "REGISTRY_TOKEN": "test-placeholder"}
-                with patch.dict(os.environ, env, clear=True), patch.object(release, "command", side_effect=["a" * 40, "a" * 40, "1792800000"]), patch.object(release.API, "request", return_value={"login": "publisher"}), patch.object(release.API, "release", return_value=None), contextlib.redirect_stdout(io.StringIO()):
+                env = {"GITHUB_EVENT_PATH": str(event), "GITHUB_EVENT_NAME": "create", "GITHUB_SERVER_URL": "https://git.example", "GITHUB_REPOSITORY": "repos/wardstone", "RELEASE_TOKEN": "test-placeholder"}
+                with patch.dict(os.environ, env, clear=True), patch.object(release, "command", side_effect=["a" * 40, "a" * 40]), patch.object(release.API, "request") as request, patch.object(release.API, "release", return_value=None), contextlib.redirect_stdout(io.StringIO()):
+                    release.prepare_tag(None)
+                self.assertEqual(request.call_count, 1)
+                self.assertEqual(request.call_args.kwargs["data"]["tag_name"], "v1.2.3")
+                self.assertFalse(request.call_args.kwargs["data"]["draft"])
+
+    def test_full_build_rejects_tag_notifications(self):
+        for name in ("create", "push"):
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as temp:
+                event = Path(temp) / "event.json"
+                event.write_text('{"ref_type":"tag","ref":"v1.2.3"}')
+                with patch.dict(os.environ, {"GITHUB_EVENT_PATH": str(event), "GITHUB_EVENT_NAME": name}, clear=True), patch.object(release, "command") as command, self.assertRaisesRegex(ValueError, "published release"):
                     release.plan(None)
-                self.assertIn("tag=v1.2.3\n", output.read_text())
-                self.assertIn("publish=true\n", output.read_text())
+                command.assert_not_called()
+
+    def test_three_gitea_notifications_route_to_one_full_build(self):
+        workflows = Path(__file__).resolve().parents[1] / ".gitea" / "workflows"
+        def events(name):
+            text = (workflows / name).read_text()
+            block = text.split("\non:\n", 1)[1].split("\npermissions:", 1)[0]
+            return set(re.findall(r"^  ([a-z_]+):", block, re.MULTILINE)) - {"workflow_dispatch"}
+        full = events("release.yaml")
+        prepare = events("prepare-release.yaml")
+        self.assertEqual(full, {"release"})
+        self.assertEqual(prepare, {"create"})
+        notifications = ("push", "create", "release")
+        self.assertEqual(sum(event in full for event in notifications), 1)
+        self.assertEqual(sum(event in prepare for event in notifications), 1)
+        self.assertIn("secrets.ACTIONS_TOKEN", (workflows / "prepare-release.yaml").read_text())
+
+    def test_existing_release_and_draft_are_never_republished_by_tag_handler(self):
+        api = release.API("https://git.example", "repos/wardstone", "test-placeholder")
+        for draft in (False, True):
+            with self.subTest(draft=draft), patch.object(api, "release", return_value={"draft": draft, "body": "user notes"}), patch.object(api, "request") as request, contextlib.redirect_stdout(io.StringIO()):
+                self.assertFalse(release.ensure_tag_release(api, "v1.2.3", "a" * 40))
+                request.assert_not_called()
+
+    def test_tag_only_publishes_once_and_marks_prereleases(self):
+        api = release.API("https://git.example", "repos/wardstone", "test-placeholder")
+        with patch.object(api, "release", side_effect=[None, {"id": 1}]), patch.object(api, "request") as request, contextlib.redirect_stdout(io.StringIO()):
+            self.assertTrue(release.ensure_tag_release(api, "v1.2.3-rc.1", "a" * 40))
+            self.assertFalse(release.ensure_tag_release(api, "v1.2.3-rc.1", "a" * 40))
+            request.assert_called_once()
+            self.assertTrue(request.call_args.kwargs["data"]["prerelease"])
+
+    def test_concurrent_ui_release_creation_is_preserved(self):
+        api = release.API("https://git.example", "repos/wardstone", "test-placeholder")
+        with patch.object(api, "release", side_effect=[None, {"draft": True, "body": "user notes"}]), patch.object(api, "request", side_effect=RuntimeError("Gitea POST: HTTP 409")) as request, contextlib.redirect_stdout(io.StringIO()):
+            self.assertFalse(release.ensure_tag_release(api, "v1.2.3", "a" * 40))
+            request.assert_called_once()
+
+    def test_tag_creation_does_not_swallow_real_api_errors(self):
+        api = release.API("https://git.example", "repos/wardstone", "test-placeholder")
+        with patch.object(api, "release", return_value=None), patch.object(api, "request", side_effect=RuntimeError("Gitea POST: HTTP 403")), self.assertRaisesRegex(RuntimeError, "HTTP 403"):
+            release.ensure_tag_release(api, "v1.2.3", "a" * 40)
 
     def test_publication_requires_matching_tag_commit(self):
         with tempfile.TemporaryDirectory() as temp:

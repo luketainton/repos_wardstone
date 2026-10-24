@@ -122,21 +122,53 @@ def outputs(values):
                 stream.write(f"{key}={value}\n")
 
 
-def plan(args):
+def event_context():
     event = json.loads(Path(os.environ.get("GITHUB_EVENT_PATH", os.environ.get("GITEA_EVENT_PATH", "/dev/null"))).read_text() or "{}")
     name = os.environ.get("GITHUB_EVENT_NAME", os.environ.get("GITEA_EVENT_NAME", "workflow_dispatch"))
+    return event, name
+
+
+def ensure_tag_release(api, tag, commit):
+    _, prerelease = version(tag)
+    if api.release(tag) is not None:
+        # Keep user-created notes and draft status. Publication is the sole build event.
+        print("Gitea release already exists; leaving it unchanged")
+        return False
+    try:
+        api.request(api.repo + "/releases", method="POST", data={"tag_name": tag, "target_commitish": commit, "name": tag, "body": f"Wardstone {tag}\n\nRelease artifacts are being built by Gitea Actions.", "draft": False, "prerelease": prerelease})
+    except RuntimeError:
+        # A UI/API release can win the race after our initial lookup.
+        if api.release(tag) is None:
+            raise
+        print("Release was created concurrently; leaving it unchanged")
+        return False
+    print(f"Published Gitea release entry for {tag}; the Release workflow will build its artifacts")
+    return True
+
+
+def prepare_tag(args):
+    event, name = event_context()
+    if name != "create" or event.get("ref_type") != "tag":
+        raise ValueError("Release preparation requires a tag-creation event")
+    tag = event.get("ref", "").removeprefix("refs/tags/")
+    version(tag)
+    commit = command("git", "rev-parse", "HEAD")
+    if command("git", "rev-parse", f"refs/tags/{tag}^{{commit}}") != commit:
+        raise ValueError("Checked-out commit does not match the release tag")
+    token = os.environ.get("RELEASE_TOKEN", "")
+    if not token:
+        raise RuntimeError("ACTIONS_TOKEN is required to create a release that triggers Actions")
+    api = API(os.environ["GITHUB_SERVER_URL"], os.environ["GITHUB_REPOSITORY"], token)
+    ensure_tag_release(api, tag, commit)
+
+
+def plan(args):
+    event, name = event_context()
+    if name not in ("release", "workflow_dispatch"):
+        raise ValueError("Full release builds require a published release or manual dispatch")
     inputs = event.get("inputs", {})
-    publish = name in ("push", "create", "release") or str(inputs.get("publish", "false")).lower() == "true"
+    publish = name == "release" or str(inputs.get("publish", "false")).lower() == "true"
     tag = event.get("release", {}).get("tag_name") or inputs.get("tag")
-    if not tag and name in ("push", "create"):
-        ref = os.environ.get("GITHUB_REF", os.environ.get("GITEA_REF", ""))
-        if name == "create":
-            if event.get("ref_type") != "tag":
-                raise ValueError("Publishing requires a tag event")
-            ref = event.get("ref", ref)
-        elif not ref.startswith("refs/tags/"):
-            raise ValueError("Publishing requires a tag event")
-        tag = ref.removeprefix("refs/tags/")
     if not tag:
         if publish:
             raise ValueError("Publishing requires an existing version tag")
@@ -277,6 +309,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="action", required=True)
     sub.add_parser("plan")
+    sub.add_parser("prepare-tag")
     for action in ("build", "publish"):
         child = sub.add_parser(action)
         child.add_argument("--tag", required=True)
@@ -286,7 +319,7 @@ def main():
             child.add_argument("--digest", required=True)
     args = parser.parse_args()
     try:
-        {"plan": plan, "build": build, "publish": publish}[args.action](args)
+        {"plan": plan, "prepare-tag": prepare_tag, "build": build, "publish": publish}[args.action](args)
     except (ValueError, RuntimeError, OSError, subprocess.CalledProcessError) as error:
         parser.exit(1, str(error) + "\n")
 

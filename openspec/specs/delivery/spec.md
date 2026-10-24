@@ -12,11 +12,19 @@ The repository SHALL run formatting checks, vetting, race-enabled Go tests, rele
 - **THEN** it verifies that anonymous admin access is denied, the generated P12 authenticates successfully, and restart preserves the credential without logging its password again
 
 ### Requirement: Versioned releases
-The release workflow SHALL run for pushed version tags, tags created through Gitea UI/API, and published Gitea releases. It SHALL verify the checked-out commit matches the requested tag and SHALL reject malformed versions.
+The full release workflow SHALL use published Gitea releases as its only automatic build trigger. A separate lightweight tag-creation workflow SHALL create a published release only if one is absent, covering both Git tag pushes and Gitea UI/API tag creation without redundant builds. It SHALL verify the checked-out commit matches the requested tag and SHALL reject malformed versions.
 
 #### Scenario: New version tag
 - **WHEN** a tag matching vMAJOR.MINOR.PATCH or a prerelease variant is pushed
 - **THEN** the workflow revalidates source, builds release archives, and publishes the matching container image and Gitea assets
+
+#### Scenario: Three notifications for one tag and release
+- **WHEN** Gitea emits push, create, and release-published notifications for the same version
+- **THEN** exactly one full release workflow is triggered; the create notification only prepares a release if necessary and push does not trigger another full build
+
+#### Scenario: Existing draft or concurrent release
+- **WHEN** a tag's release already exists or is created concurrently through Gitea
+- **THEN** tag preparation preserves its notes and draft state without publishing it again
 
 ### Requirement: Release artifacts
 Each complete release SHALL include amd64 and arm64 binaries for Linux, macOS, and Windows, deterministic archive metadata, SHA256 checksums, build version and commit information, and a manifest identifying the published container digest.

@@ -1,0 +1,30 @@
+name: Prepare release
+
+on:
+  create:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: prepare-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    if: github.event.ref_type == 'tag' && (startsWith(github.event.ref, 'v') || startsWith(github.event.ref, 'refs/tags/v'))
+    name: Ensure the tag has a Gitea release
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Create a published release only if absent
+        # A PAT is intentional: Gitea suppresses follow-on events from its job token.
+        env:
+          RELEASE_TOKEN: ${{ secrets.ACTIONS_TOKEN }}
+        run: python3 scripts/release.py prepare-tag
