@@ -592,3 +592,53 @@ func TestForeignCARejected(t *testing.T) {
 		}
 	}
 }
+
+// Browsers derive form POST origins from the page's referrer policy. A
+// no-referrer policy makes even same-origin form navigation send Origin: null.
+func TestAdminFormOriginProtection(t *testing.T) {
+	f := newFixture(t)
+	status, _, headers := f.request(f.client, "GET", "/admin", nil, false)
+	if status != http.StatusOK || headers.Get("Referrer-Policy") != "same-origin" {
+		t.Fatalf("admin page status=%d referrer policy=%q; forms must retain their same-origin Origin", status, headers.Get("Referrer-Policy"))
+	}
+	for _, tc := range []struct {
+		name, origin, site, token string
+		want                      int
+	}{
+		{"same-origin", f.a.issuer, "same-origin", f.csrf, http.StatusSeeOther},
+		{"foreign-origin", "https://attacker.example", "same-origin", f.csrf, http.StatusForbidden},
+		{"opaque-origin", "null", "same-origin", f.csrf, http.StatusForbidden},
+		{"cross-site", f.a.issuer, "cross-site", f.csrf, http.StatusForbidden},
+		{"missing-token", f.a.issuer, "same-origin", "", http.StatusForbidden},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			form := url.Values{"name": {tc.name}, "csrf": {tc.token}}
+			req, err := http.NewRequest(http.MethodPost, f.server.URL+"/admin/user", strings.NewReader(form.Encode()))
+			if err != nil {
+				t.Fatal(err)
+			}
+			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			req.Header.Set("Origin", tc.origin)
+			req.Header.Set("Sec-Fetch-Site", tc.site)
+			res, err := f.client.Do(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer res.Body.Close()
+			if res.StatusCode != tc.want {
+				t.Fatalf("create user status=%d want=%d", res.StatusCode, tc.want)
+			}
+			var count int
+			if err := f.s.db.QueryRow("SELECT COUNT(*) FROM users WHERE name=?", tc.name).Scan(&count); err != nil {
+				t.Fatal(err)
+			}
+			wantCount := 0
+			if tc.want == http.StatusSeeOther {
+				wantCount = 1
+			}
+			if count != wantCount {
+				t.Fatalf("created users=%d want=%d", count, wantCount)
+			}
+		})
+	}
+}

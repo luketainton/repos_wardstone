@@ -67,7 +67,8 @@ func (a *app) handler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
-		w.Header().Set("Referrer-Policy", "no-referrer")
+		// Preserve Origin on same-origin form POSTs; no-referrer makes it null.
+		w.Header().Set("Referrer-Policy", "same-origin")
 		w.Header().Set("X-Frame-Options", "DENY")
 		r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 		// Public protocol endpoints authenticate apps/tokens. Browser identity always requires mTLS.
