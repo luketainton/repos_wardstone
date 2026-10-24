@@ -118,3 +118,7 @@ To rehearse the pipeline, open Actions → Release → Run workflow, leave `tag`
 For local packaging, run `python3 scripts/release.py build --tag v0.1.0 --output dist` from the repository root (the tag here is an example). For a local container test run `python3 scripts/container_smoke.py --image wardstone:ci`; Podman users can pass `--engine podman`. The Docker engine must be available, and Go must be installed to compile the small HTTPS smoke client.
 
 To use a published image with the supplied Compose file, export `WARDSTONE_IMAGE=git.tainton.uk/repos/wardstone:<tag>`, retain the UID/GID and bind-mount setup above, run `docker compose pull`, then `docker compose up -d --no-build`. Releases deliver artifacts and images; they do not automatically restart an unspecified deployment.
+
+## Pangolin TLS passthrough
+
+For `cba.tainton.uk` on port 443, see [the deployment and rollback guide](deploy/pangolin/README.md). It documents the hostname-specific TCP route, the separately exported server certificate, the read-only Compose mount, and renewal without changing Wardstone client identities or enabling Pangolin mTLS.

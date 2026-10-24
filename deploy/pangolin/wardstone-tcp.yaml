@@ -1,0 +1,16 @@
+# Merge this tcp section into the existing Traefik dynamic_config.yml.
+# Preserve all existing http routers, services, and middlewares.
+tcp:
+  routers:
+    wardstone-tls:
+      entryPoints:
+        - websecure
+      rule: "HostSNI(`cba.tainton.uk`)"
+      service: wardstone-tls
+      tls:
+        passthrough: true
+  services:
+    wardstone-tls:
+      loadBalancer:
+        servers:
+          - address: "172.17.0.1:18471"

@@ -1,0 +1,6 @@
+SHELL=/bin/sh
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+# Export renewed server TLS material; only restart an already-running Wardstone
+# if its loaded public certificate differs from the validated export.
+*/5 * * * * root /usr/local/sbin/wardstone-export-server-certificate
