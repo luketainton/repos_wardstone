@@ -5,7 +5,7 @@ go 1.27.3
 require (
 	github.com/beevik/etree v1.8.1
 	github.com/crewjam/saml v0.5.1
-	github.com/go-jose/go-jose/v4 v4.1.6
+	github.com/go-jose/go-jose/v4 v4.1.7
 	github.com/google/uuid v1.6.0
 	github.com/russellhaering/goxmldsig v1.6.1
 	github.com/zitadel/oidc/v3 v3.51.16
