@@ -9,7 +9,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/russellhaering/goxmldsig v1.6.1
 	github.com/zitadel/oidc/v3 v3.51.16
-	modernc.org/sqlite v1.61.0
+	modernc.org/sqlite v1.61.1
 	software.sslmate.com/src/go-pkcs12 v0.7.4
 )
 
