@@ -8,16 +8,16 @@ require (
 	github.com/go-jose/go-jose/v4 v4.1.7
 	github.com/google/uuid v1.6.0
 	github.com/russellhaering/goxmldsig v1.6.1
-	github.com/zitadel/oidc/v3 v3.51.16
+	github.com/zitadel/oidc/v3 v3.51.17
 	modernc.org/sqlite v1.61.1
 	software.sslmate.com/src/go-pkcs12 v0.7.4
 )
 
 require (
-	github.com/bmatcuk/doublestar/v4 v4.10.3 // indirect
+	github.com/bmatcuk/doublestar/v4 v4.10.4 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/dustin/go-humanize v1.1.0 // indirect
-	github.com/go-chi/chi/v5 v5.4.0 // indirect
+	github.com/go-chi/chi/v5 v5.5.0 // indirect
 	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/gorilla/securecookie v1.1.2 // indirect
